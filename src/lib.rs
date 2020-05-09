@@ -1,10 +1,10 @@
 //! # read-restrict
 //!
-//! An adaption of Rust's standard `Read::take` implementation modified
-//! to return an error when the limit is exceeded.
+//! An adaptor around Rust's standard `Read::take` which returns an error when
+//! the limit is exceeded.
 //!
 //! This may be useful for enforcing resource limits while not silently
-//! truncating when limits are exceeded.
+//! truncating when they are exceeded.
 //!
 //! # Example
 //!

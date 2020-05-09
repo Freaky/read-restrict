@@ -30,10 +30,9 @@ impl<T: BufRead> BufRead for Restrict<T> {}
 
 ## Description
 
-This is a modified version of Rust's stdlib `Read::take` implementation which
-returns an error when its limit is exceeded.  Reads operate as normal, bound
-strictly to the read limit, following which `io::ErrorKind::InvalidData` will
-be returned.
+This is a thin wrapper around `Read::take` which which returns an error when its
+limit is exceeded.  Reads operate as normal, bound strictly to the read limit,
+following which `io::ErrorKind::InvalidData` will be returned.
 
 # Example
 

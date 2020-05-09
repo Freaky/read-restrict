@@ -25,17 +25,15 @@
 //!     Ok(())
 //! }
 
-use std::cmp;
-use std::io::{self, BufRead, Read, Result};
+use std::io::{self, BufRead, Read, Result, Take};
 
 pub trait ReadExt {
     fn restrict(self, restriction: u64) -> Restrict<Self>
     where
-        Self: Sized,
+        Self: Sized + Read,
     {
         Restrict {
-            inner: self,
-            restriction,
+            inner: self.take(restriction),
         }
     }
 }
@@ -51,8 +49,7 @@ impl<R: Read> ReadExt for R {}
 /// [`restrict`]: trait.ReadExt.html#method.restrict
 #[derive(Debug)]
 pub struct Restrict<T> {
-    inner: T,
-    restriction: u64,
+    inner: Take<T>,
 }
 
 impl<T> Restrict<T> {
@@ -78,7 +75,7 @@ impl<T> Restrict<T> {
     /// }
     /// ```
     pub fn restriction(&self) -> u64 {
-        self.restriction
+        self.inner.limit()
     }
 
     /// Sets the number of bytes that can be read before this instance will
@@ -106,7 +103,7 @@ impl<T> Restrict<T> {
     /// }
     /// ```
     pub fn set_restriction(&mut self, restriction: u64) {
-        self.restriction = restriction;
+        self.inner.set_limit(restriction);
     }
 
     /// Consumes the `Restrict`, returning the wrapped reader.
@@ -131,7 +128,7 @@ impl<T> Restrict<T> {
     /// }
     /// ```
     pub fn into_inner(self) -> T {
-        self.inner
+        self.inner.into_inner()
     }
 
     /// Gets a reference to the underlying reader.
@@ -156,7 +153,7 @@ impl<T> Restrict<T> {
     /// }
     /// ```
     pub fn get_ref(&self) -> &T {
-        &self.inner
+        self.inner.get_ref()
     }
 
     /// Gets a mutable reference to the underlying reader.
@@ -185,45 +182,37 @@ impl<T> Restrict<T> {
     /// }
     /// ```
     pub fn get_mut(&mut self) -> &mut T {
-        &mut self.inner
+        self.inner.get_mut()
     }
 }
 
 impl<T: Read> Read for Restrict<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.restriction == 0 {
+        if self.restriction() == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Read restriction exceeded",
             ));
         }
 
-        let max = cmp::min(buf.len() as u64, self.restriction) as usize;
-        let n = self.inner.read(&mut buf[..max])?;
-        self.restriction -= n as u64;
-        Ok(n)
+        self.inner.read(&mut buf[..])
     }
 }
 
 impl<T: BufRead> BufRead for Restrict<T> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
         // Don't call into inner reader at all at EOF because it may still block
-        if self.restriction == 0 {
+        if self.restriction() == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Read restriction exceeded",
             ));
         }
 
-        let buf = self.inner.fill_buf()?;
-        let cap = cmp::min(buf.len() as u64, self.restriction) as usize;
-        Ok(&buf[..cap])
+        self.inner.fill_buf()
     }
 
     fn consume(&mut self, amt: usize) {
-        // Don't let callers reset the restrict by passing an overlarge value
-        let amt = cmp::min(amt as u64, self.restriction) as usize;
-        self.restriction -= amt as u64;
         self.inner.consume(amt);
     }
 }

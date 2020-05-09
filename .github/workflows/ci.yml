@@ -8,20 +8,20 @@ jobs:
         with:
           rust-version: stable
           components: "rustfmt,clippy"
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
       - name: Check fmt and clippy
         run: cargo fmt -- --check && cargo clippy -- -Dwarnings
   test:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macOS-latest]
+        os: [ubuntu-latest]
         rust: [stable, nightly]
 
     steps:
     - uses: hecrj/setup-rust-action@v1
       with:
         rust-version: ${{ matrix.rust }}
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: Run tests
       run: cargo test --verbose

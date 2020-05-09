@@ -1,79 +1,59 @@
-[![Cargo](https://img.shields.io/crates/v/filesize.svg)][crate]
-[![Documentation](https://docs.rs/filesize/badge.svg)][docs]
-[![Build Status](https://travis-ci.org/Freaky/rust-filesize.svg?branch=master)](https://travis-ci.org/Freaky/rust-filesize)
-[![CI](https://github.com/Freaky/rust-filesize/workflows/build/badge.svg)][ci]
+[![Cargo](https://img.shields.io/crates/v/read-restrict.svg)][crate]
+[![Documentation](https://docs.rs/read-restrict/badge.svg)][docs]
+[![CI](https://github.com/Freaky/read-restrict/workflows/build/badge.svg)][ci]
 
-# filesize
+# read-restrict
 
-Cross-platform physical disk space use retrieval for Rust.
+Enforce a strict limit on the number of bytes read from a `Read` with an error
+when exceeded.
 
 ## Synopsis
 
 ```rust
-pub trait PathExt {
-    fn size_on_disk(&self) -> std::io::Result<u64>;
-    fn size_on_disk_fast(&self, metadata: &Metadata) -> std::io::Result<u64>;
+pub trait ReadExt {
+    fn restrict(self, restriction: u64) -> Restrict<Self>
 }
-impl PathExt for std::path::Path;
 
-pub fn file_real_size<P: AsRef<std::path::Path>>(path: P) -> std::io::Result<u64>;
-pub fn file_real_size_fast<P: AsRef<std::path::Path>>(
-    path: P,
-    metadata: &Metadata
-) -> std::io::Result<u64>;
+impl<R: Read> ReadExt for R {}
+
+impl<T> Restrict<T> {
+    pub fn restriction(&self) -> u64;
+    pub fn set_restriction(&mut self, restriction: u64);
+    pub fn into_inner(self) -> T;
+    pub fn get_ref(&self) -> &T;
+    pub fn get_mut(&mut self) -> &mut T;
+}
+
+impl<T: Read> Read for Restrict<T> {}
+impl<T: BufRead> BufRead for Restrict<T> {}
 ```
 
 ## Description
 
-`filesize` abstracts platform-specific methods of determining the real space used
-by files, taking into account filesystem compression and sparse files.
+This is a modified version of Rust's stdlib `Read::take` implementation which
+returns an error when its limit is exceeded.  Reads operate as normal, bound
+strictly to the read limit, following which `io::ErrorKind::InvalidData` will
+be returned.
 
-It provides two standalone functions, `file_real_size`, and `file_real_size_fast`,
-and as of version 0.2, a `std::path::Path` extension trait offering identical
-functions named `size_on_disk` and `size_on_disk_fast`.
-
-The `_fast` variants accept a `std::fs::Metadata` reference which will be used
-to cheaply calculate the size on disk if the platform supports that.  This is
-intended for cases such as directory traversal, where metadata is available
-anyway, and where metadata is needed for other purposes.
-
-## Example
+# Example
 
 ```rust
-use std::path::Path;
-use filesize::PathExt;
+use std::io::{self, ErrorKind, Result};
+use std::io::prelude::*;
+use std::fs::File;
+use read_restrict::ReadExt;
 
-let path = Path::new("Cargo.toml");
-let metadata = path.symlink_metadata()?;
-
-let realsize = path.size_on_disk()?;
-let realsize = path.size_on_disk_fast(&metadata)?;
-
-// Older interface
-use filesize::{file_real_size, file_real_size_fast};
-
-let realsize = file_real_size(path)?;
-let realsize = file_real_size_fast(path, &metadata)?;
+fn main() -> io::Result<()> {
+    let f = File::open("foo.txt")?.restrict(5);
+    let mut handle = f.restrict(5);
+    let mut buf = [0; 8];
+    assert_eq!(5, handle.read(&mut buf)?); // reads at most 5 bytes
+    assert_eq!(0, handle.restriction()); // is now exhausted
+    assert_eq!(ErrorKind::InvalidData, handle.read(&mut buf).unwrap_err().kind());
+    Ok(())
+}
 ```
 
-## Platform-specific Behaviour
-
-On Unix platforms this is a thin wrapper around [`std::fs::symlink_metadata()`]
-and [`std::os::unix::fs::MetadataExt`], simply returning `blocks() * 512`.  The
-`_fast` functions disregard the file path entirely and use the passed metadata
-directly.
-
-On Windows, it wraps [`GetCompressedFileSizeW()`], and the `_fast` functions
-disregard the passed metadata entirely.
-
-On any other platforms, it wraps [`std::fs::symlink_metadata()`] and only returns
-`len()`, while the `_fast` variants also disregard the path and use the passed 
-metadata directly.
-
-
-[`GetCompressedFileSizeW()`]: https://docs.microsoft.com/en-us/windows/desktop/api/fileapi/nf-fileapi-getcompressedfilesizew
-[`std::fs::symlink_metadata()`]: https://doc.rust-lang.org/std/fs/fn.symlink_metadata.html
-[`std::os::unix::fs::MetadataExt`]: https://doc.rust-lang.org/std/os/unix/fs/trait.MetadataExt.html
-[crate]: https://crates.io/crates/filesize
-[docs]: https://docs.rs/filesize
-[ci]: https://github.com/Freaky/rust-filesize/actions?query=workflow%3Abuild
+[crate]: https://crates.io/crates/read-restrict
+[docs]: https://docs.rs/read-restrict
+[ci]: https://github.com/Freaky/read-restrict/actions?query=workflow%3Abuild

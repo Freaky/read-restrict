@@ -1,4 +1,3 @@
-
 //! # read-restrict
 //!
 //! An adaption of Rust's standard `Read::take` implementation modified
@@ -34,7 +33,10 @@ pub trait ReadExt {
     where
         Self: Sized,
     {
-        Restrict { inner: self, restriction }
+        Restrict {
+            inner: self,
+            restriction,
+        }
     }
 }
 
@@ -238,7 +240,10 @@ mod tests {
         let mut buf = [0; 5];
         assert_eq!(4, f.read(&mut buf).unwrap());
         assert_eq!(b"[pac", &buf[0..4]);
-        assert_eq!(io::ErrorKind::InvalidData, f.read(&mut buf).unwrap_err().kind());
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            f.read(&mut buf).unwrap_err().kind()
+        );
 
         let mut f = BufReader::new(f.into_inner()).restrict(4);
         assert_eq!(b"kage", f.fill_buf().unwrap());
@@ -263,7 +268,13 @@ mod tests {
         }
 
         let mut buf = [0; 1];
-        assert_eq!(io::ErrorKind::InvalidData, R.restrict(0).read(&mut buf).unwrap_err().kind());
-        assert_eq!(io::ErrorKind::InvalidData, R.restrict(0).fill_buf().unwrap_err().kind());
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            R.restrict(0).read(&mut buf).unwrap_err().kind()
+        );
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            R.restrict(0).fill_buf().unwrap_err().kind()
+        );
     }
 }

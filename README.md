@@ -43,7 +43,7 @@ use std::fs::File;
 use read_restrict::ReadExt;
 
 fn main() -> io::Result<()> {
-    let f = File::open("foo.txt")?.restrict(5);
+    let f = File::open("foo.txt")?;
     let mut handle = f.restrict(5);
     let mut buf = [0; 8];
     assert_eq!(5, handle.read(&mut buf)?); // reads at most 5 bytes

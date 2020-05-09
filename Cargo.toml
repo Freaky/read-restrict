@@ -1,0 +1,12 @@
+[package]
+name = "read-restrict"
+description = "Restrict the number of bytes read from a reader"
+version = "0.1.0"
+authors = ["Thomas Hurst <tom@hur.st>"]
+edition = "2018"
+license = "MIT OR Apache-2.0"
+keywords = ["read", "limit", "restriction"]
+categories = ["rust-patterns"]
+readme = "README.md"
+
+[dependencies]

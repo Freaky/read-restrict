@@ -201,7 +201,6 @@ impl<T: Read> Read for Restrict<T> {
 
 impl<T: BufRead> BufRead for Restrict<T> {
     fn fill_buf(&mut self) -> Result<&[u8]> {
-        // Don't call into inner reader at all at EOF because it may still block
         if self.restriction() == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,

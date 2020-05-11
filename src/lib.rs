@@ -164,7 +164,7 @@ impl<T> Restrict<T> {
     /// Gets a mutable reference to the underlying reader.
     ///
     /// Care should be taken to avoid modifying the internal I/O state of the
-    /// underlying reader as doing so may corrupt the internal restrict of this
+    /// underlying reader as doing so may corrupt the internal limit of this
     /// `Restrict`.
     ///
     /// # Examples

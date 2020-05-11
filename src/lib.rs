@@ -193,7 +193,7 @@ impl<T> Restrict<T> {
 
 impl<T: Read> Read for Restrict<T> {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
-        if self.restriction() == 0 {
+        if !buf.is_empty() && self.restriction() == 0 {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 "Read restriction exceeded",

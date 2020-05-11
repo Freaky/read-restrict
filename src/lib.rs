@@ -1,7 +1,7 @@
 //! # read-restrict
 //!
-//! An adaptor around Rust's standard `Read::take` which returns an error when
-//! the limit is exceeded.
+//! An adaptor around Rust's standard [`io::Take`] which returns an error of
+//! of the kind [`ErrorKind::InvalidData`]  when the limit is exceeded.
 //!
 //! This may be useful for enforcing resource limits while not silently
 //! truncating when they are exceeded.
@@ -24,6 +24,10 @@
 //!     assert_eq!(ErrorKind::InvalidData, handle.read(&mut buf).unwrap_err().kind());
 //!     Ok(())
 //! }
+//! ```
+//!
+//! [`io::Take`]: https://doc.rust-lang.org/std/io/struct.Take.html
+//! [`ErrorKind::InvalidData`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.InvalidData
 
 use std::io::{self, BufRead, Read, Result, Take};
 
@@ -41,12 +45,13 @@ pub trait ReadExt {
 impl<R: Read> ReadExt for R {}
 
 /// Reader adaptor which restricts the bytes read from an underlying reader,
-/// returning an IO error when it is exceeded.
+/// returning an IO error of the kind [`ErrorKind::InvalidData`] when it is exceeded.
 ///
 /// This struct is generally created by calling [`restrict`] on a reader.
 /// Please see the documentation of [`restrict`] for more details.
 ///
 /// [`restrict`]: trait.ReadExt.html#method.restrict
+/// [`ErrorKind::InvalidData`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.InvalidData
 #[derive(Debug)]
 pub struct Restrict<T> {
     inner: Take<T>,

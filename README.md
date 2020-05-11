@@ -30,11 +30,13 @@ impl<T: BufRead> BufRead for Restrict<T> {}
 
 ## Description
 
-This is a thin wrapper around `Read::take` which which returns an error when its
-limit is exceeded.  Reads operate as normal, bound strictly to the read limit,
-following which `io::ErrorKind::InvalidData` will be returned.
+A thin wrapper around [`io::Take`] - instead of returning `Ok(0)` when exhausted,
+a `Restrict` returns an error of the kind [`ErrorKind::InvalidData`].
 
-# Example
+This is intended for use when resource limits should be enforced by failing rather
+than silently truncating.
+
+## Example
 
 ```rust
 use std::io::{self, ErrorKind, Result};
@@ -56,3 +58,5 @@ fn main() -> io::Result<()> {
 [crate]: https://crates.io/crates/read-restrict
 [docs]: https://docs.rs/read-restrict
 [ci]: https://github.com/Freaky/read-restrict/actions?query=workflow%3Abuild
+[`io::Take`]: https://doc.rust-lang.org/std/io/struct.Take.html
+[`ErrorKind::InvalidData`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.InvalidData

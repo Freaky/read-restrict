@@ -9,15 +9,13 @@
 //! # Example
 //!
 //! ```no_run
-//! use std::io::{self, ErrorKind, Result};
-//! use std::io::prelude::*;
-//! use std::fs::File;
+//! use std::io::{self, Read, ErrorKind};
+//!
 //! use read_restrict::ReadExt;
 //!
 //! fn main() -> io::Result<()> {
-//!     let f = File::open("foo.txt")?.restrict(5);
+//!     let f = std::fs::File::open("foo.txt")?;
 //!     let mut handle = f.restrict(5);
-//!
 //!     let mut buf = [0; 8];
 //!     assert_eq!(5, handle.read(&mut buf)?); // reads at most 5 bytes
 //!     assert_eq!(0, handle.restriction()); // is now exhausted

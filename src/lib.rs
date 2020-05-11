@@ -224,23 +224,37 @@ impl<T: BufRead> BufRead for Restrict<T> {
 #[cfg(test)]
 mod tests {
     use super::ReadExt;
-    use std::io::{self, BufRead, BufReader, Read};
+    use std::io::{self, BufRead, BufReader, Cursor, Read};
 
     #[test]
     fn restrict() {
-        let mut f = std::fs::File::open("Cargo.toml").unwrap().restrict(4);
+        let data = b"Stupidity is the same as evil if you judge by the results";
+        let mut f = Cursor::new(&data[..]).restrict(0);
 
-        let mut buf = [0; 5];
-        assert_eq!(4, f.read(&mut buf).unwrap());
-        assert_eq!(b"[pac", &buf[0..4]);
+        // empty reads always succeed
+        let mut buf = [0; 0];
+        assert_eq!(0, f.read(&mut buf).unwrap());
+
+        let mut buf = [0; 1];
         assert_eq!(
             io::ErrorKind::InvalidData,
             f.read(&mut buf).unwrap_err().kind()
         );
 
-        let mut f = BufReader::new(f.into_inner()).restrict(4);
-        assert_eq!(b"kage", f.fill_buf().unwrap());
-        f.consume(4);
+        // restriction can be dynamically adjusted
+        f.set_restriction(6);
+        let mut buf = [0; 8];
+        assert_eq!(6, f.read(&mut buf).unwrap());
+        assert_eq!(b"Stupid", &buf[..6]);
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            f.read(&mut buf).unwrap_err().kind()
+        );
+
+        // and leaves the reader in a consistent position
+        let mut f = BufReader::new(f.into_inner()).restrict(3);
+        assert_eq!(b"ity", f.fill_buf().unwrap());
+        f.consume(3);
         assert_eq!(io::ErrorKind::InvalidData, f.fill_buf().unwrap_err().kind());
     }
 

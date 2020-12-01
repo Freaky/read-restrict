@@ -10,6 +10,9 @@ when exceeded.
 ## Synopsis
 
 ```rust
+pub fn read<P: AsRef<Path>>(path: P, restriction: usize) -> io::Result<Vec<u8>>;
+pub fn read_to_string<P: AsRef<Path>>(path: P, restriction: usize) -> io::Result<String>;
+
 pub trait ReadExt {
     fn restrict(self, restriction: u64) -> Restrict<Self>;
 }
@@ -30,11 +33,16 @@ impl<T: BufRead> BufRead for Restrict<T> {}
 
 ## Description
 
-A thin wrapper around [`io::Take`] - instead of returning `Ok(0)` when exhausted,
-a `Restrict` returns an error of the kind [`ErrorKind::InvalidData`].
+An adaptor around Rust's standard [`io::Take`] which instead of returning
+`Ok(0)` when the read limit is exceeded, instead returns an error of of the kind
+[`ErrorKind::InvalidData`].
 
 This is intended for enforcing explicit input limits when simply truncating with
 `take` could result in incorrect behaviour.
+
+`read_restrict` also offers restricted variants of [`std::fs::read`] and
+[`std::fs::read_to_string`], to conveniently prevent unbounded reads of
+overly-large files.
 
 ## Example
 
@@ -67,8 +75,20 @@ fn main() -> std::io::Result<()> {
 }
 ```
 
+Or even better:
+
+```rust
+fn main() -> std::io::Result<()> {
+    let input = read_restrict::read_to_string("foo.json", 640 * 1024)?;
+    let _data = serde_json::from_str(input)?;
+    Ok(())
+}
+```
+
 [crate]: https://crates.io/crates/read-restrict
 [docs]: https://docs.rs/read-restrict
 [ci]: https://github.com/Freaky/read-restrict/actions?query=workflow%3Abuild
 [`io::Take`]: https://doc.rust-lang.org/std/io/struct.Take.html
 [`ErrorKind::InvalidData`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.InvalidData
+[`std::fs::read`]: https://doc.rust-lang.org/std/fs/fn.read.html
+[`std::fs::read_to_string`]: https://doc.rust-lang.org/std/fs/fn.read_to_string.html

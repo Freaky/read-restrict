@@ -1,12 +1,18 @@
 //! # read-restrict
 //!
-//! An adaptor around Rust's standard [`io::Take`] which returns an error of
-//! of the kind [`ErrorKind::InvalidData`]  when the limit is exceeded.
+//! An adaptor around Rust's standard [`io::Take`] which instead of returning
+//! `Ok(0)` when the read limit is exceeded, instead returns an error of of the kind
+//! [`ErrorKind::InvalidData`].
 //!
-//! This may be useful for enforcing resource limits while not silently
-//! truncating when they are exceeded.
+//! This is intended for enforcing explicit input limits when simply truncating with
+//! `take` could result in incorrect behaviour.
 //!
-//! # Example
+//! `read_restrict` also offers restricted variants of
+//! [`std::fs::read`](std::fs::read) and
+//! [`std::fs::read_to_string`](std::fs::read_to_string), to conveniently
+//! prevent unbounded reads of overly-large files.
+//!
+//! # Examples
 //!
 //! ```no_run
 //! use std::io::{self, Read, ErrorKind};
@@ -24,10 +30,21 @@
 //! }
 //! ```
 //!
+//! ```no_run
+//! fn load_config(path: &std::path::Path) -> std::io::Result<String> {
+//!     // No sensible configuration is going to exceed 640 KiB
+//!     let conf = read_restrict::read_to_string(&path, 640 * 1024)?;
+//!     // probably want to parse it here
+//!     Ok(conf)
+//! }
+//! ```
+//!
 //! [`io::Take`]: https://doc.rust-lang.org/std/io/struct.Take.html
 //! [`ErrorKind::InvalidData`]: https://doc.rust-lang.org/std/io/enum.ErrorKind.html#variant.InvalidData
 
+use std::fs::File;
 use std::io::{self, BufRead, Read, Result, Take};
+use std::path::Path;
 
 pub trait ReadExt {
     fn restrict(self, restriction: u64) -> Restrict<Self>
@@ -219,10 +236,101 @@ impl<T: BufRead> BufRead for Restrict<T> {
     }
 }
 
+/// Provided the file at `path` fits within the specified limit, pass a
+/// restricted read handle and a suitable initial buffer size to the closure
+/// and return its result.
+fn open_with_restriction<F, T>(path: &Path, restriction: usize, f: F) -> io::Result<T>
+where
+    F: FnOnce(Restrict<File>, usize) -> io::Result<T>,
+{
+    let file = File::open(path)?;
+    let size = match file.metadata().map(|m| m.len()) {
+        Ok(size) if size > restriction as u64 => {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "File exceeds size restriction",
+            ))
+        }
+        Ok(size) => (size as usize).saturating_add(1),
+        Err(_) => 0,
+    };
+    f(file.restrict(restriction as u64 + 1), size)
+}
+
+/// Read the entire contents of a file into a bytes vector, provided it fits
+/// within a specified size limit.
+///
+/// This is a restricted alternative to [`std::fs::read`](std::fs::read)
+/// with otherwise identical semantics.
+///
+/// # Examples
+///
+/// ```no_run
+/// fn main() -> std::io::Result<()> {
+///     let vec_at_most_64_bytes = read_restrict::read("foo.txt", 64)?;
+///     Ok(())
+/// }
+/// ```
+pub fn read<P: AsRef<Path>>(path: P, restriction: usize) -> io::Result<Vec<u8>> {
+    open_with_restriction(path.as_ref(), restriction, |mut file, size| {
+        let mut bytes = Vec::with_capacity(size);
+        file.read_to_end(&mut bytes)?;
+        Ok(bytes)
+    })
+}
+
+/// Read the entire contents of a file into a string, provided it fits within a
+/// specified size limit.
+///
+/// This is a restricted alternative to [`std::fs::read_to_string`](std::fs::read_to_string)
+/// with otherwise identical semantics.
+///
+/// # Examples
+///
+/// ```no_run
+/// fn main() -> std::io::Result<()> {
+///     let string_at_most_64_bytes = read_restrict::read_to_string("foo.txt", 64)?;
+///     Ok(())
+/// }
+/// ```
+pub fn read_to_string<P: AsRef<Path>>(path: P, restriction: usize) -> io::Result<String> {
+    open_with_restriction(path.as_ref(), restriction, |mut file, size| {
+        let mut string = String::with_capacity(size);
+        file.read_to_string(&mut string)?;
+        Ok(string)
+    })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::ReadExt;
+    use super::{read, read_to_string, ReadExt};
     use std::io::{self, BufRead, BufReader, Cursor, Read};
+
+    #[test]
+    fn test_read() {
+        let path = "Cargo.toml";
+        let size = std::fs::metadata(&path).unwrap().len() as usize;
+
+        assert_eq!(size, read(&path, size).unwrap().len());
+
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            read(&path, size - 1).unwrap_err().kind()
+        );
+    }
+
+    #[test]
+    fn test_read_to_string() {
+        let path = "Cargo.toml";
+        let size = std::fs::metadata(&path).unwrap().len() as usize;
+
+        assert_eq!(size, read_to_string(&path, size).unwrap().len());
+
+        assert_eq!(
+            io::ErrorKind::InvalidData,
+            read_to_string(&path, size - 1).unwrap_err().kind()
+        );
+    }
 
     #[test]
     fn restrict() {
